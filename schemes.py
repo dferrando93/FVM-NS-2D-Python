@@ -1,64 +1,133 @@
-# -*- coding: utf-8 -*-
 """
-Created on Wed May 24 16:25:58 2023
+Modificaciones a hacer:
+    - Acabar clase Equation.
+    
+    - Crear funciones para cada scheme, conveccion, difusion, temporal, 
+      gradiente.
+      
+     - Tener en cuenta el tipo de condicion de contorno de los fields
+"""
 
-@author: diego
-"""
+
+
 import numpy as np
 from fields import *
 from auxilary_functions import *
 
 class Equation:
     
-    def __init__(self):
+    def __init__(self, A, q):
+        self.A = A
+        self.q = q
+    
+    def solve():
         pass
 
-def gradient():
-    pass
-
-def divergence():
-    pass
-
 def get_normal_vector(cell, face):
+    ## CORREGIR LA FUNCION
+    
     cell_center = cell.get_center()
     face_center = face.get_center()
-    
+ 
     normal_vector = np.array((face_center - cell_center).get_coordinates())
     normal_vector /= mag(normal_vector)
-
-    for i, v in enumerate(normal_vector):
-        if abs(v) < 0.01:
-            normal_vector[i] = 0
-        elif abs(v) > 0.99:
-            normal_vector[i] = 1
-    
     return normal_vector
 
-def upwind(phi, cell_number, time):
+
+def get_neighbor(face, cell):
+    neighbor = face.get_owner_cell()
+    for c in neighbor:
+        if c != cell.get_label():
+            return c
+
+def interpolate_cell(Uf_rho, cell, time, interpolation):
     
-    face_list = phi.get_faces()
-    cell = phi.get_cells()[cell_number]
     cell_face_labels = cell.get_face_labels()
     cell_faces = cell.get_faces()
     
-
     normal_vectors = [get_normal_vector(cell, face) for face in cell_faces]
-
-    data = phi[time]
-    data = [data[int(f)] for f in cell_face_labels]
-    phi = [np.dot(d, n) for d, n in zip(data, normal_vectors)]
+    phi = Uf_rho[time]
+    phi = [phi[int(l)] for l in cell_face_labels]
     
-    q = [data[i] for i, f in enumerate(cell_faces) if f.get_face_type() != "internal"]
-    #d = [data[i] for i, f in enumerate(cell_faces) if f.get_face_type() == "internal"]
+    phi = [np.dot(u, n) for u, n in zip (phi, normal_vectors)]
+    A = np.zeros(Uf_rho.get_number_of_cells())
+    q = np.zeros(Uf_rho.get_number_of_cells())
     
-    print(q, d)
+    for i, f in enumerate(cell_faces):
+        
+        if f.get_face_type() == "internal":
+            neighbor = get_neighbor(f, cell)
     
+            if interpolation.lower() == "upwind":
+                if phi[i] >= 0:
+                    label = int(cell.get_label())
+                elif phi[i] < 0:
+                    label = int(neighbor)
+                A[label] += phi[i]
+               
+            elif interpolation.lower() == "linear":
+                cell_distance = distance_between_points(cell.get_center(), f.get_center())
+                neighbor_cell = Uf_rho.get_cells()[neighbor]
+                neighbor_distance = distance_between_points(neighbor_cell.get_center(), f.get_center())
+          
+            
+                A[int(cell.get_label())] += phi[i] * cell_distance
+                A[int(neighbor_cell.get_label())] += phi[i] *neighbor_distance
+                
+        else:
+            q[int(cell.get_label())] += phi[i]
     
+    return A, q
+        
+def interpolate_convection(Uf_rho, time, interpolation):
 
+    A = np.zeros((Uf_rho.get_number_of_cells(), Uf_rho.get_number_of_cells()))
+    q = np.zeros(Uf_rho.get_number_of_cells())
+    
+    for cell in Uf_rho.get_cells():
+        label = int(cell.get_label())
+        A_cell, q_cell = interpolate_cell(Uf_rho, cell, time, interpolation)
+        A[label] = A_cell
+        q += q_cell
+    
+    return Equation(A, q)
 
-def linear():
-    pass
+# Revisar
+def cell_gradient(field, cell, time):
+    field = field[time]
+    faces = cell.get_faces()
+    face_centers = [f.get_center() for f in faces]
+    cell_center = cell.get_center()
+    center_distance = [distance_between_points(cell_center, face_center)
+                       for face_center in face_centers]
+    
+    total_distance = sum(center_distance)
+    grad = sum([field[int(f.get_label())] * d / total_distance for f, d in
+                    zip(faces, center_distance)])
+    
+    return grad
 
+def gradient(field, time):
+    if field.field_type == "face_field":
+        new_field = np.array([cell_gradient(field, cell, time) for cell
+                              in field.get_cells()])
+        
+   
+        if field.variable_type == "scalar":
+            return Scalar_Cell_Field("grad({0})".format(field.get_field_name()),
+                                     field, time0 = time, data0 = new_field)
+        elif field.variable_type == "vector":
+            return Vector_Cell_Field("grad({0})".format(field.get_field_name()),
+                                     field, time0 = time, data0 = new_field)
+        
+    elif field.variable_type == "vector_field":
+        pass
+    
+def delta_time_euler(field0, deltaT, equation):
+    
+    A = -1*equation.A * deltaT
+    q = field0 + equation.q
+    return Equation(A, q)
 
 if __name__ == "__main__":
     
@@ -71,8 +140,14 @@ if __name__ == "__main__":
     
     Uf = Vector_Face_Field("U", mesh, data0 = [2, 1])
     Uf.set_initial_condition("Wall", [0, 0])
-    Uf.set_initial_condition("Inlet", [3, 0])
+    Uf.set_initial_condition("Inlet", [2, 1])
     Uf.set_initial_condition("Outlet", [2, 1])
-    Uf.set_initial_condition("Atmosphere", [0, 3])
-
-    upwind(Uf, 4, 0)
+    Uf.set_initial_condition("Atmosphere", [0, 0])
+    
+    data0 = [0 for c in mesh.get_cells()]
+    data0[3] = 1    
+    alpha = Scalar_Cell_Field("alpha", mesh, time0 = "0", data0 = data0)
+           
+    conv = interpolate_convection(Uf, 0, "linear")
+    
+    equation = delta_time_euler(alpha[0], 1, conv)

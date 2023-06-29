@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Mesh classes and utilities. 
 - Classes defined:
@@ -6,9 +5,17 @@ Mesh classes and utilities.
     - Face()
     - Cell()
     - Mesh()
-- Functions defined:
     
+- Functions defined:
+    - createMesh()
 """
+
+"""
+Modificaciones a hacer:
+    
+    - Crear condicion de contorno periodic.
+"""
+
 import auxilary_functions as af
 import numpy as np
 import matplotlib.pyplot as plt
@@ -97,13 +104,10 @@ class Point():
 
 class Face():
     """
-    Point class used to define mesh vertex or auxiliar points shuch as 
-    central points.
+    Face class used to define mesh faces.
     
-    x: x coordinate
-    y: y cordinate
-    label: name of the point. If the point is calculated, the default label
-    is aux
+    points: list of points that form the face
+    label: name of the face.
     face_type: kind of face. Internal or external. External faces can be also
     boundary conditions
     """
@@ -112,6 +116,7 @@ class Face():
         self.points = points
         self.label = label
         self.face_type = face_type
+        self.bc_type = None
         self.face_center = self.calculate_face_center()
         self.normal_vector = self.calculate_normal_vector()
         self.face_length= self.calculate_face_length()
@@ -170,14 +175,32 @@ class Face():
         if label not in self.owner_cells:
             self.owner_cells.append(label)
     
-    def get_owner_cell(self, label):
+    def get_owner_cell(self):
         return self.owner_cells
 
     def set_slave_points(self):
         for p in self.points:
             p.add_owner_face(self.label)
+    
+    def set_boundary_condition_type(self, bc_type, bc_value):
+        self.bc_type = bc_type
+        self.bc_value = bc_value
+        
+    def set_periodic_face(self, periodic_face):
+        self.periodic_face = periodic_face
+
+    def get_periodic_face(self):
+        return self.periodic_face
+
 
 class Cell():
+    """
+    Cell class used to define mesh cells
+    
+    faces: faces that form the cell
+    label: name of the cell. 
+
+    """
 
     def __init__(self, faces, label):
         self.faces = faces
@@ -251,9 +274,17 @@ class Cell():
     def set_slave_faces(self):
         for f in self.get_faces():
             f.add_owner_cell(self.label)
+    
 
 
 class Mesh:
+    """
+    Mesh class
+    
+    cells: list of cells
+    faces: list of faces
+    points: list of points
+    """
     
     def __init__(self,  cells, faces, points):
         self.cells = cells
@@ -337,8 +368,22 @@ class Mesh:
                   f.get_center().get_y() <= list_y[1] 
                   )]
         self.set_boundary_condition(labels, bc_name)
-        
     
+    def set_periodic_patch(self, patch1, patch2):
+        
+        faces_1 = [f for f in self.get_faces() if f.get_face_type() == patch1]
+        faces_2 = [f for f in self.get_faces() if f.get_face_type() == patch2]
+        
+        if len(faces_1) != len(faces_2):
+            raise("Patch {0} and patch {1} has different number of faces".format(
+                   patch1, patch2))
+        
+        for f1, f2 in zip(faces_1, faces_2):
+            f1.set_periodic_face(f2.get_label())
+            f1.set_face_type("periodic")
+            f2.set_periodic_face(f1.get_label())
+            f2.set_face_type("periodic")
+                
     def visualize_mesh(self, show_points = False, show_faces = False):
         fig = plt.figure()
         for p in self.points:
@@ -361,6 +406,8 @@ class Mesh:
                 color = "red"
             elif face_type.lower() == "wall":
                 color = "brown"    
+            elif face_type.lower() == "periodic":
+                color = "blue"
             else:
                 color = "grey"
             plt.plot([p1[0], p2[0]], [p1[1], p2[1]], c = color)
@@ -379,34 +426,44 @@ class Mesh:
 
 
 def create_mesh(xMin, yMin, xMax, yMax, nx, ny):
+    
+    """
+    Mesh generator. Create a structured isotropic grid.
+    
+    xMin, yMin, xMax, yMax: Coordinates to define mesh boundaries
+    nx, ny: Number of elements in the axis x and y
+    
+    return: A Mesh class
+    """
+    
     dx = abs(xMax - xMin) / nx
     dy = abs(yMax - yMin) / ny
     
     x = [dx * i for i in range(nx + 1)]
     y = [dy * i for i in range(ny + 1)]
     
-    points = np.array([Point(xi, yi, str(i+j*(nx+1))) 
+    points = np.array([Point(xi, yi, i+j*(nx+1)) 
                        for j, yi in enumerate(y) for i, xi in enumerate(x)])
     points = points.reshape(ny + 1, nx + 1)
     
-    faces_H = np.array([Face([points[i,j], points[i, j+1]], str(j+i*nx))
+    faces_H = np.array([Face([points[i,j], points[i, j+1]], j+i*nx)
                        for i in range(ny+1) for j in range(nx)])
     faces_H = faces_H.reshape(ny +1 , nx)
 
     faces_V = np.array([Face([points[i,j], points[i + 1, j]], 
-                       str(int(faces_H[-1,-1].get_label()) + j + i*(nx+1) + 1))
+                      faces_H[-1,-1].get_label() + j + i*(nx+1) + 1)
                        for i in range(ny) for j in range(nx+1)])
     faces_V = faces_V.reshape(ny, nx + 1)
         
     cells = np.array([Cell([faces_H[i, j], faces_H[i + 1, j], 
                             faces_V[i, j], faces_V[i, j+1]],
-                            str(j + nx*i))
+                            j + nx*i)
                       for i in range(ny) for j in range(nx)])
     
-    face_list = [f for l in faces_H for f in l] + [f for l in faces_V for f in l]
-    point_list = [p for l in points for p in l]
+    faces = [f for l in faces_H for f in l] + [f for l in faces_V for f in l]
+    points = [p for l in points for p in l]
     
-    return Mesh(cells, face_list, point_list)
+    return Mesh(cells, faces, points)
    
     
 if __name__ == "__main__":
@@ -417,4 +474,5 @@ if __name__ == "__main__":
     mesh.create_boundary_condition([0,0], [0,10], "Inlet")
     mesh.create_boundary_condition([4,4], [0,10], "Outlet")
     mesh.create_boundary_condition([0,10], [4,4], "Atmosphere")
-    mesh.visualize_mesh(show_points = False, show_faces=False)
+    mesh.set_periodic_patch("Inlet", "Outlet")
+    mesh.visualize_mesh(show_points = False, show_faces=True)
