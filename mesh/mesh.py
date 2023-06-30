@@ -1,6 +1,6 @@
 import sys
-sys.path.append("..") 
-from functions.auxilary_functions import *
+sys.path.append("../functions")
+from auxilary_functions import *
 from face import Face
 from point import Point
 from cell import Cell

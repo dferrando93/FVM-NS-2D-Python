@@ -18,12 +18,11 @@ Modificaciones:
 
 """
 import sys
-sys.path.append("..") 
+sys.path.append("../") 
+sys.path.append("../functions/")
 import numpy as np
 from mesh.mesh import Mesh, create_mesh
-from mesh.face import Face
-from mesh.point import Point
-from mesh.cell import Cell
+from auxilary_functions import *
 
     
 class Field(Mesh):
@@ -39,7 +38,10 @@ class Field(Mesh):
     def __init__(self, field_name, mesh, data = None, dimensions = None):
         Mesh.__init__(self,mesh.get_cells(),mesh.get_faces(),mesh.get_points())
         
+        self.name = field_name
         self.dimensions = dimensions
+        self.cell_values = np.array([0 for i in range(self.get_number_of_cells())])
+        self.face_values = np.array([0 for i in range(self.get_number_of_faces())])
     
     def get_field_name(self):
         return self.name
@@ -48,20 +50,10 @@ class Field(Mesh):
         return self.dimensions
     
     def get_cell_values(self):
-        
-        if self.cell_values:
-            return self.cell_values
-        else:
-            pass
-            #return interpolate_from_faces(self)
+        return self.cell_values
     
     def get_face_values(self):
-        
-        if self.face_values:
-            return self.face_values
-        else:
-            pass
-            #return interpolate_from_cells(self)
+        return self.face_values
     
     def set_cell_values(self, data):
         
@@ -74,7 +66,7 @@ class Field(Mesh):
                 print("Cell values not set")
         
         elif isinstance(data, float) or isinstance(data, int):
-            self.cell_values(np.array([data for i in range(nCells)]))      
+            self.cell_values = np.array([data for i in range(nCells)])      
     
     def set_face_values(self, data):
         
@@ -104,7 +96,21 @@ class Field(Mesh):
                     "NO TERMINADA"
                     face.set_boundary_condition_type("neumann", value)
                     self.face_values[i] = 0      
-    
+                    
+    def interpolate_from_cells(self):
+        faces = self.get_faces()
+        cells = self.get_cells()
+       
+        for f in faces:
+            if f.get_face_type().lower() == "internal":
+                face_center = f.get_center()
+                owners = f.get_owner_cell()
+                cell_centers = [cells[l].get_center() for l in owners]
+                values = [self.cell_values[l] for l in owners]
+                face_value = linear_interpolation(face_center, cell_centers[0],
+                                         cell_centers[1], values[0], values[1])
+                self.face_values[f.get_label()] = face_value
+                
     def __add__(self, field2, time):
         pass
     
@@ -117,7 +123,12 @@ class Field(Mesh):
     def __truediv__(self, field2, time):
         pass
         
-
+def linear_interpolation(p0, p1, p2, v1, v2):
+    delta_x1 = distance_between_points(p0, p1)
+    delta_x2 = distance_between_points(p0, p2)
+    delta_xt = delta_x1 + delta_x2
+    return (v1 * delta_x1 + v2 * delta_x2)/delta_xt
+    
 
 if __name__ == "__main__":
     mesh = create_mesh(xMin = 0, yMin = 0, xMax = 4, yMax = 4, nx = 3, ny = 3)
@@ -126,6 +137,11 @@ if __name__ == "__main__":
     mesh.create_boundary_condition([4,4], [0,10], "Outlet")
     mesh.create_boundary_condition([0,10], [4,4], "Atmosphere")
     mesh.visualize_mesh(show_points = False, show_faces=True)
-
+    
+    Ux = Field("U", mesh)
+    Ux.set_cell_values([2,4,6,2,4,6,2,4,6])
+    Ux.interpolate_from_cells()
+    c = Ux.get_cell_values()
+    a = Ux.get_face_values()
     
     
