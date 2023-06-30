@@ -1,19 +1,4 @@
 """
-Field classes and utilities. 
-- Classes defined:
-    - Time()
-    - Field(Mesh, Time)
-    - Face_Field(Field)
-    - Cell_Field(Field)
-    - Scalar_Face_Field(Field)
-    - Vector_Face_Field(Field)
-    - Scalar_Cell_Field(Field)
-    - Vector_Cell_Field(Field)
-    
-- Functions defined:
-    - createMesh()
-"""
-"""
 Modificaciones: 
     
     - Eliminar tipos de field, con el primero vale. Dentro de field crear una 
@@ -32,35 +17,16 @@ Modificaciones:
       las direcciones dos a dos
 
 """
-
+import sys
+sys.path.append("..") 
 import numpy as np
-from mesh import Mesh
-from mesh import create_mesh
+from mesh.mesh import Mesh, create_mesh
+from mesh.face import Face
+from mesh.point import Point
+from mesh.cell import Cell
 
-class Time:
     
-    """
-    Time class. It creates two empty lists, one for time label and the other 
-    for the data on that time
-    """
-    
-    def __init__(self):
-        self.time = []
-        self.data = []
-        
-    def __getitem__(self, key):
-        if isinstance(key, int):
-            return self.data[key]
-        
-        elif isinstance(key, str):
-            return self.data[self.time.index(key)]
-    
-    def add_time(self, time, data):
-        self.time.append(time)
-        self.data.append(data)  
- 
-    
-class Field(Mesh, Time):
+class Field(Mesh):
     
     """
     Field class and its functions.
@@ -70,143 +36,87 @@ class Field(Mesh, Time):
     dimensions: dimensions of the variable, just informative
     """
     
-    def __init__(self, field_name, mesh, dimensions = None):
+    def __init__(self, field_name, mesh, data = None, dimensions = None):
         Mesh.__init__(self,mesh.get_cells(),mesh.get_faces(),mesh.get_points())
-        Time.__init__(self)
         
-        self.name = field_name
-       # self.type = "scalar"
         self.dimensions = dimensions
     
     def get_field_name(self):
         return self.name
     
-    def get_field_type(self):
-        return self.type
-    
     def get_dimensions(self):
         return self.dimensions
     
-    def add_new_time(self, time, data):
-    
-        if self.variable_type == "scalar":
-            if isinstance(data, list) or isinstance(data, np.ndarray):
-                self.add_time(time, np.array(data))
-            
-            elif isinstance(data, float) or isinstance(data, int):
-                self.add_time(time, np.array([data for i in range(self.nData)]))
-            
-            else:
-                self.add_time(time, np.array([data for i in range(self.nData)]))
-                
-        if self.variable_type == "vector":
-            if isinstance(data[0], list) or isinstance(data[0], np.ndarray):
-                self.add_time(time, np.array(data))
-            
-            elif isinstance(data[0], float) or isinstance(data[0], int):
-                self.add_time(time, np.array([data for i in range(self.nData)]))
-            
-            else:
-                self.add_time(time, np.array([data for i in range(self.nData)]))
-    
-    def __add__(self, field2, time):
-        return self[time] + field2[time]
-    
-    def __sub__(self, field2, time):
-        return self[time] - field2[time]
-    
-    def __mul__(self, field2, time):
-        return self[time] * field2[time]
-    
-    def __truediv__(self, field2, time):
-        return self[time] / field2[time]
-    
-class Face_Field(Field):
-    
-    """
-    Face_Field class. The values are stored in the mesh faces
-    
-    time0 = label of the first time
-    data0 = data of time0
-    """
-    
-    def __init__(self, field_name, mesh, time0 = "0", data0 = None):
-        Field.__init__(self, field_name, mesh)
-        self.nData = self.nFaces
-        if data0:
-            self.add_new_time(time0, data0)
-            
-    def __repr__(self):    
-        text = "Face Field: {0} ({1})".format(self.name, self.variable_type)
-        text += "\nTimes:" + ",".join([" {0:.2f}s".format(float(t)) for t in self.time])
-        return text
-    
-    def set_initial_condition(self, bc_name, bc_type, value):
+    def get_cell_values(self):
         
+        if self.cell_values:
+            return self.cell_values
+        else:
+            pass
+            #return interpolate_from_faces(self)
+    
+    def get_face_values(self):
+        
+        if self.face_values:
+            return self.face_values
+        else:
+            pass
+            #return interpolate_from_cells(self)
+    
+    def set_cell_values(self, data):
+        
+        nCells = self.get_number_of_cells()
+        if isinstance(data, list) or isinstance(data, np.ndarray):
+            if len(data) == nCells:
+                self.cell_values = data
+            else:
+                print("Data range different from number of cells")
+                print("Cell values not set")
+        
+        elif isinstance(data, float) or isinstance(data, int):
+            self.cell_values(np.array([data for i in range(nCells)]))      
+    
+    def set_face_values(self, data):
+        
+        nFaces = self.get_number_of_faces()
+        if isinstance(data, list) or isinstance(data, np.ndarray):
+            if len(data) == nFaces:
+                self.face_values = data
+            else:
+                print("Data range different from number of faces")
+                print("Face values not set")
+        
+        elif isinstance(data, float) or isinstance(data, int):
+            self.face_values(np.array([data for i in range(nFaces)])) 
+    
+    def set_initial_conditions(self, bc_name, bc_type, value):
         faces = self.get_faces()
-        data = self[0]
+        
         for i, face in enumerate(faces):
             
             if face.get_face_type() == bc_name:
                 
                 if bc_type.lower() == "dirichlet":
                     face.set_boundary_condition_type("dirichlet", value)
-                    data[i] = value
+                    self.face_values[i] = value
                 
                 if bc_type.lower() == "neumann":
-                    face.set_boundary_condition_type("dirichlet", value)
-                    data[i] = 0
-
+                    "NO TERMINADA"
+                    face.set_boundary_condition_type("neumann", value)
+                    self.face_values[i] = 0      
     
-class Cell_Field(Field):
+    def __add__(self, field2, time):
+        pass
     
-    """
-    Cell_Field class. The values are stored in the mesh cells
+    def __sub__(self, field2, time):
+        pass
     
-    time0 = label of the first time
-    data0 = data of time0
-    """
+    def __mul__(self, field2, time):
+        pass
     
-    
-    def __init__(self, field_name, mesh, time0 = "0", data0 = None):
-        Field.__init__(self, field_name, mesh)
-        self.nData = self.nCells
-        if data0:
-            self.add_new_time(time0, data0)
-    
-    def __repr__(self):    
-        text = "Cell Field: {0} ({1})".format(self.name, self.variable_type)
-        text += "\nTimes:" + ",".join([" {0:.2f}s".format(float(t)) for t in self.time])
-        return text
-    
-    
-def dot(self, field2, time):
-    return np.array([np.dot(f1, f2) for f1, f2 in zip(self[time], field2[time])])
-
-
-class Scalar_Face_Field(Face_Field):
-    def __init__(self, field_name, mesh, time0 = "0", data0 = None):
-        self.variable_type = "scalar"
-        self.field_type = "face_field"
-        Face_Field.__init__(self, field_name, mesh, time0, data0)
-
-class Vector_Face_Field(Face_Field):
-    def __init__(self, field_name, mesh, time0 = "0", data0 = None):
-        self.variable_type = "vector"
-        self.field_type = "face_field"
-        Face_Field.__init__(self, field_name, mesh, time0, data0)
-
-class Scalar_Cell_Field(Cell_Field):
-    def __init__(self, field_name, mesh, time0 = "0", data0 = None):
-        self.field_type = "cell_field"
-        self.variable_type = "scalar"
-        Cell_Field.__init__(self, field_name, mesh, time0, data0)
-
-class Vector_Cell_Field(Cell_Field):
-    def __init__(self, field_name, mesh, time0 = "0", data0 = None):
-        self.variable_type = "vector"
-        self.field_type = "cell_field"
-        Cell_Field.__init__(self, field_name, mesh, time0, data0)
+    def __truediv__(self, field2, time):
+        pass
+        
 
 
 if __name__ == "__main__":
@@ -216,13 +126,6 @@ if __name__ == "__main__":
     mesh.create_boundary_condition([4,4], [0,10], "Outlet")
     mesh.create_boundary_condition([0,10], [4,4], "Atmosphere")
     mesh.visualize_mesh(show_points = False, show_faces=True)
-    
-    Uf = Vector_Face_Field("U", mesh, data0 = [2, 1])
-    Uf.add_new_time("2", [1,0])
-    Uf.set_initial_condition("Wall", [0, 0])
-    Uf.set_initial_condition("Inlet", [3, 0])
-    Uf.set_initial_condition("Outlet", [2, 1])
-    Uf.set_initial_condition("Atmosphere", [0, 3])
 
     
     
