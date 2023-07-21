@@ -8,11 +8,15 @@ Modificaciones a hacer:
      - Tener en cuenta el tipo de condicion de contorno de los fields
 """
 
-
-
+import sys
+sys.path.append("../") 
+sys.path.append("../functions/")
+sys.path.append("../mesh") 
+sys.path.append("../field") 
 import numpy as np
 from fields import *
 from auxilary_functions import *
+
 
 class Equation:
     
@@ -131,23 +135,27 @@ def delta_time_euler(field0, deltaT, equation):
 
 if __name__ == "__main__":
     
-    mesh = create_mesh(xMin = 0, yMin = 0, xMax = 4, yMax = 4, nx = 3, ny = 3)
+    mesh = create_mesh(xMin = 0, yMin = 0, xMax = 10, yMax = 1, nx = 10, ny = 1)
     mesh.create_boundary_condition([0,10], [0,0], "Wall")
     mesh.create_boundary_condition([0,0], [0,10], "Inlet")
-    mesh.create_boundary_condition([4,4], [0,10], "Outlet")
+    mesh.create_boundary_condition([10, 10], [0,10], "Outlet")
     mesh.create_boundary_condition([0,10], [4,4], "Atmosphere")
     mesh.visualize_mesh(show_points = False, show_faces=True)
     
-    Uf = Vector_Face_Field("U", mesh, data0 = [2, 1])
-    Uf.set_initial_condition("Wall", [0, 0])
-    Uf.set_initial_condition("Inlet", [2, 1])
-    Uf.set_initial_condition("Outlet", [2, 1])
-    Uf.set_initial_condition("Atmosphere", [0, 0])
+    T = Field("T", mesh)
+    T.set_cell_values([0,1,1,0,0,0,0,0,0,0])
+    #T.interpolate_from_cells()
     
-    data0 = [0 for c in mesh.get_cells()]
-    data0[3] = 1    
-    alpha = Scalar_Cell_Field("alpha", mesh, time0 = "0", data0 = data0)
-           
-    conv = interpolate_convection(Uf, 0, "linear")
+    T.set_initial_condition("Wall", "neumann", 0)
+    T.set_initial_condition("Inlet", "neumann",0)
+    T.set_initial_condition("Outlet", "neumann",0)
+    T.set_initial_condition("Atmosphere", "neumann",0)
+
+    U = Field("U", mesh)
+    U.set_cell_values(1)
+    U.set_initial_condition("Wall", "neumann", 0)
+    U.set_initial_condition("Inlet", "neumann",0)
+    U.set_initial_condition("Outlet", "neumann",0)
+    U.set_initial_condition("Atmosphere", "neumann",0)
     
-    equation = delta_time_euler(alpha[0], 1, conv)
+    eq = interpolate_convection()
