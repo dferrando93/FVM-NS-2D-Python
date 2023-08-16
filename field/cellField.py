@@ -21,10 +21,10 @@ sys.path.append("../mesh")
 import numpy as np
 from field import Field
 from mesh import Mesh, create_mesh
-from auxilary_functions import *
+from fieldFunctions import *
 
     
-class CellField(Field):
+class Cell_Field(Field):
     
     """
     """
@@ -51,73 +51,73 @@ class CellField(Field):
 
     def __add__(self, f2):
         if isinstance(f2, float) or isinstance(f2, int):
-            return CellField("{0} + {1}".format(self.name, f2),
+            return Cell_Field("{0} + {1}".format(self.name, f2),
                              self.mesh, data = self.values + f2, 
                              dimensions = self.dimensions)
         
         elif isinstance(f2, type(self)):
-            return CellField("{0} + {1}".format(self.name, f2),
+            return Cell_Field("{0} + {1}".format(self.name, f2),
                              self.mesh, data = self.values + f2.values, 
                              dimensions = self.dimensions)
     
     def __sub__(self, f2):
         if isinstance(f2, float) or isinstance(f2, int):
-            return CellField("{0} - {1}".format(self.name, f2),
+            return Cell_Field("{0} - {1}".format(self.name, f2),
                              self.mesh, data = self.values - f2, 
                              dimensions = self.dimensions)
         
         elif isinstance(f2, type(self)):
-            return CellField("{0} - {1}".format(self.name, f2),
+            return Cell_Field("{0} - {1}".format(self.name, f2),
                              self.mesh, data = self.values - f2.values, 
                              dimensions = self.dimensions)
     
     def __mul__(self, f2):
         if isinstance(f2, float) or isinstance(f2, int):
-            return CellField("{0} * {1}".format(self.name, f2),
+            return Cell_Field("{0} * {1}".format(self.name, f2),
                              self.mesh, data = self.values * f2, 
                              dimensions = None)
         
         elif isinstance(f2, type(self)):
-            return CellField("{0} * {1}".format(self.name, f2),
+            return Cell_Field("{0} * {1}".format(self.name, f2),
                              self.mesh, data = self.values * f2.values, 
                              dimensions = None)
     
     def __truediv__(self, f2):
         if isinstance(f2, float) or isinstance(f2, int):
             f2 += 1e-8
-            return CellField("{0} * {1}".format(self.name, f2),
+            return Cell_Field("{0} * {1}".format(self.name, f2),
                              self.mesh, data = self.values / f2, 
                              dimensions = None)
         
         elif isinstance(f2, type(self)):
             f2 += 1e-8
-            return CellField("{0} * {1}".format(self.name, f2),
+            return Cell_Field("{0} * {1}".format(self.name, f2),
                              self.mesh, data = self.values / f2.values, 
                              dimensions = None)
+    
     def interpolate_from_faces(self, face_field):
-        check_field_lenghts(self, cell_field)
+        check_field_lenghts(self, face_field)
         faces = self.get_faces()
         cells = self.get_cells()
        
         for c in cells:
             cell_faces_labels = c.get_face_labels()
             face_centers = [faces[l].get_center() for l in cell_faces_labels]
-            face_values = [self.face_values[l] for l in cell_faces_labels]
+            face_values = [face_field.values[l] for l in cell_faces_labels]
             cell_value = linear_cell_interpolation(c, face_centers, face_values)
-            
             self.values[c.get_label()] = cell_value
 
 
-
-
 if __name__ == "__main__":
-    mesh = create_mesh(xMin = 0, yMin = 0, xMax = 3, yMax = 3, nx = 3, ny = 3)
-    mesh.create_boundary_condition([0,3], [0,0], "Wall")
-    mesh.create_boundary_condition([0,0], [0,10], "Inlet")
-    mesh.create_boundary_condition([3, 3], [0,3], "Outlet")
-    mesh.create_boundary_condition([0,3], [3,3], "Atmosphere")
+    mesh = create_mesh(xMin = 0, yMin = 0, xMax = 5, yMax = 1, nx = 5, ny = 1)
+    mesh.create_boundary_condition([0,5], [0,0], "Wall")
+    mesh.create_boundary_condition([0,0], [0,1], "Inlet")
+    mesh.create_boundary_condition([5, 5], [0,1], "Outlet")
+    mesh.create_boundary_condition([0,5], [1,1], "Atmosphere")
     mesh.visualize_mesh(show_points = False, show_faces=True)
     
-    T = CellField("T", mesh, dimensions = "K", data = 1)
-    T2 = T * T
-    print(T2.values)
+    #Ux = Face_Field("Ux", mesh, dimensions = "m/s", data = [-1, -1, 0, -1, -1, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1])
+    Vx = Cell_Field("Ux", mesh, dimensions = "m/s", data = 0)
+    #Vx.interpolate_from_faces(Ux)
+
+    

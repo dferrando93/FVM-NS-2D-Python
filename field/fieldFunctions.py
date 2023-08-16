@@ -23,9 +23,6 @@ sys.path.append("../functions/")
 sys.path.append("../mesh") 
 import numpy as np
 from field import Field
-from cellField import CellField
-from faceField import FaceField
-from fieldFunctions import *
 from mesh import Mesh, create_mesh
 from auxilary_functions import *
                

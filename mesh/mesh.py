@@ -111,9 +111,9 @@ class Mesh:
         
         for f1, f2 in zip(faces_1, faces_2):
             f1.set_periodic_face(f2.get_label())
-            f1.set_face_type("periodic")
+            f1.set_face_type("periodic2")
             f2.set_periodic_face(f1.get_label())
-            f2.set_face_type("periodic")
+            f2.set_face_type("periodic1")
                 
     def visualize_mesh(self, show_points = False, show_faces = False):
         fig = plt.figure()
@@ -137,7 +137,7 @@ class Mesh:
                 color = "red"
             elif face_type.lower() == "wall":
                 color = "brown"    
-            elif face_type.lower() == "periodic":
+            elif "periodic" in face_type.lower():
                 color = "blue"
             else:
                 color = "grey"

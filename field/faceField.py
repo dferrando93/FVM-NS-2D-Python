@@ -25,8 +25,10 @@ import numpy as np
 from field import Field
 from mesh import Mesh, create_mesh
 from auxilary_functions import *
+from fieldFunctions import *
+
     
-class FaceField(Field):
+class Face_Field(Field):
     
     """
     Field class and its functions.
@@ -58,66 +60,81 @@ class FaceField(Field):
 
     def __add__(self, f2):
         if isinstance(f2, float) or isinstance(f2, int):
-            return FaceField("{0} + {1}".format(self.name, f2),
+            return Face_Field("{0} + {1}".format(self.name, f2),
                              self.mesh, data = self.values + f2, 
                              dimensions = self.dimensions)
         
         elif isinstance(f2, type(self)):
-            return FaceField("{0} + {1}".format(self.name, f2),
+            return Face_Field("{0} + {1}".format(self.name, f2),
                              self.mesh, data = self.values + f2.values, 
                              dimensions = self.dimensions)
     
     def __sub__(self, f2):
         if isinstance(f2, float) or isinstance(f2, int):
-            return FaceField("{0} - {1}".format(self.name, f2),
+            return Face_Field("{0} - {1}".format(self.name, f2),
                              self.mesh, data = self.values - f2, 
                              dimensions = self.dimensions)
         
         elif isinstance(f2, type(self)):
-            return FaceField("{0} - {1}".format(self.name, f2),
+            return Face_Field("{0} - {1}".format(self.name, f2),
                              self.mesh, data = self.values - f2.values, 
                              dimensions = self.dimensions)
     
     def __mul__(self, f2):
         if isinstance(f2, float) or isinstance(f2, int):
-            return FaceField("{0} * {1}".format(self.name, f2),
+            return Face_Field("{0} * {1}".format(self.name, f2),
                              self.mesh, data = self.values * f2, 
                              dimensions = None)
         
         elif isinstance(f2, type(self)):
-            return FaceField("{0} * {1}".format(self.name, f2),
+            return Face_Field("{0} * {1}".format(self.name, f2),
                              self.mesh, data = self.values * f2.values, 
                              dimensions = None)
     
     def __truediv__(self, f2):
         if isinstance(f2, float) or isinstance(f2, int):
             f2 += 1e-8
-            return FaceField("{0} * {1}".format(self.name, f2),
+            return Face_Field("{0} * {1}".format(self.name, f2),
                              self.mesh, data = self.values / f2, 
                              dimensions = None)
         
         elif isinstance(f2, type(self)):
             f2 += 1e-8
-            return FaceField("{0} * {1}".format(self.name, f2),
+            return Face_Field("{0} * {1}".format(self.name, f2),
                              self.mesh, data = self.values / f2.values, 
                              dimensions = None)
-    
+        """   
+        Crear una clase que sea BC
+ 
     def set_boundary_condition(self, bc_name, bc_type, value):
         faces = self.get_faces()
-        
+                
         for i, face in enumerate(faces):
-            
-            if face.get_face_type() == bc_name:
+     
+            if face.get_face_type() in bc_name:
                 
                 if bc_type.lower() == "dirichlet":
                     face.set_boundary_condition_type("dirichlet", value)
                     self.values[i] = value
                 
-                if bc_type.lower() == "neumann":
+                elif bc_type.lower() == "neumann":
                     face.set_boundary_condition_type("neumann", value)
-                    cell = face.get_owner_cell()
-                    self.values[i] = self.cell_values[cell]
-    
+                    cell_label = face.get_owner_cell()[0]
+                    cell = self.get_cells()[cell_label]
+                    dx = distance_between_points(cell.get_center(),
+                                                 face.get_center())
+                    
+                    self.values[i] = self.cell_values[cell_label] + value / dx
+                
+                elif bc_type.lower() == "periodic":
+                    
+                    couple = faces[face.get_periodic_face()]
+                    cell_face =  face.get_owner_cell()[0]
+                    cell_couple = couple.get_owner_cell()[0]
+
+                    pass
+                """                   
+                    
     def interpolate_from_cells(self, cell_field):
         check_field_lenghts(self, cell_field)
         faces = self.get_faces()
@@ -128,7 +145,7 @@ class FaceField(Field):
                 face_center = f.get_center()
                 owners = f.get_owner_cell()
                 cell_centers = [cells[l].get_center() for l in owners]
-                values = [self.cell_values[l] for l in owners]
+                values = [cell_field.cell_values[l] for l in owners]
                 face_value = linear_interpolation(face_center, cell_centers[0],
                                          cell_centers[1], values[0], values[1])
                 
@@ -143,8 +160,11 @@ if __name__ == "__main__":
     mesh.create_boundary_condition([0,0], [0,10], "Inlet")
     mesh.create_boundary_condition([3, 3], [0,3], "Outlet")
     mesh.create_boundary_condition([0,3], [3,3], "Atmosphere")
+    mesh.set_periodic_patch("Inlet", "Outlet")
     mesh.visualize_mesh(show_points = False, show_faces=True)
     
-    T = FaceField("T", mesh, dimensions = "K", data = 1)
-    T2 = T * T
-    print(T2.values)
+    #Ux = Cell_Field("Ux", mesh, dimensions = "m/s", data = [-1, -1, 0, -1, -1, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1])
+    Vx = Face_Field("Ux", mesh, dimensions = "m/s", data = 0)
+    #Vx.interpolate_from_cells(Ux)
+    
+    #Vx.set_boundary_condition("periodic1", "neumann", 0)

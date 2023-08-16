@@ -56,13 +56,13 @@ class Field(Mesh):
     def set_values(self, data, number_of_elements):
         if isinstance(data, list) or isinstance(data, np.ndarray):
             if len(data) == number_of_elements:
-                self.values = np.array(data)
+                self.values = np.array(data).astype(float)
             else:
                 print("Data range different from number of cells")
                 print("Cell values not set")
         
         elif isinstance(data, float) or isinstance(data, int):
-            self.values = np.array([data for i in range(number_of_elements)])     
+            self.values = np.array([float(data) for i in range(number_of_elements)])     
     
     def __str__(self):
         if self.dimensions:
